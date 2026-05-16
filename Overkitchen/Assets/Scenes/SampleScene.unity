@@ -252,6 +252,9 @@ MonoBehaviour:
   - {fileID: 5906520369161191148, guid: 762513756313b524598d4be0c6769f2f, type: 3}
   - {fileID: 2326694252019110897, guid: f30201ad368ae734f849c94ef3e9e0b9, type: 3}
   - {fileID: 5624373278140240479, guid: a5398fdc38da92643bc5e3f6ce8074a1, type: 3}
+  swapDuration: 0.3
+  pieceFallDuration: 0.2
+  spawnDelay: 0.02
   padding: 1
 --- !u!4 &981846552
 Transform:
