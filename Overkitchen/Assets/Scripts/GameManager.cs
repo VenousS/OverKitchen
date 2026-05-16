@@ -76,13 +76,12 @@ public class GameManager : MonoBehaviour
         // Загружаем данные уровня
         if (LevelManager.Instance == null)
         {
-            Debug.LogError("LevelManager not found in scene!");
-            currentLevel = new LevelData(1, "Default");
+            Debug.LogWarning("LevelManager not found, создаю новый...");
+            GameObject lmGO = new GameObject("LevelManager");
+            lmGO.AddComponent<LevelManager>();
         }
-        else
-        {
-            currentLevel = LevelManager.Instance.GetCurrentLevel();
-        }
+        
+        currentLevel = LevelManager.Instance != null ? LevelManager.Instance.GetCurrentLevel() : null;
         
         if (currentLevel == null)
         {
@@ -97,6 +96,13 @@ public class GameManager : MonoBehaviour
         InitializeGoalProgress();
         
         // Инициализируем скоринг
+        if (ScoreCalculator.Instance == null)
+        {
+            Debug.LogWarning("ScoreCalculator not found, создаю новый...");
+            GameObject scGO = new GameObject("ScoreCalculator");
+            scGO.AddComponent<ScoreCalculator>();
+        }
+        
         if (ScoreCalculator.Instance != null)
             ScoreCalculator.Instance.ResetScore();
         
