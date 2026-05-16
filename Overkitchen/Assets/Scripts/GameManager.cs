@@ -74,7 +74,22 @@ public class GameManager : MonoBehaviour
     private IEnumerator StartGame()
     {
         // Загружаем данные уровня
-        currentLevel = LevelManager.Instance.GetCurrentLevel();
+        if (LevelManager.Instance == null)
+        {
+            Debug.LogError("LevelManager not found in scene!");
+            currentLevel = new LevelData(1, "Default");
+        }
+        else
+        {
+            currentLevel = LevelManager.Instance.GetCurrentLevel();
+        }
+        
+        if (currentLevel == null)
+        {
+            Debug.LogError("Could not load level data!");
+            currentLevel = new LevelData(1, "Default");
+        }
+        
         gridSize = currentLevel.gridSize;
         movesRemaining = currentLevel.moveLimit;
         timeRemaining = currentLevel.timeLimit;
@@ -82,7 +97,8 @@ public class GameManager : MonoBehaviour
         InitializeGoalProgress();
         
         // Инициализируем скоринг
-        ScoreCalculator.Instance.ResetScore();
+        if (ScoreCalculator.Instance != null)
+            ScoreCalculator.Instance.ResetScore();
         
         CenterCamera();
         InitializeGrids();
@@ -114,7 +130,8 @@ public class GameManager : MonoBehaviour
         if (FindObjectOfType<GameHUD>() != null)
         {
             int lives = PlayerProgress.Instance != null ? PlayerProgress.Instance.GetLives() : 0;
-            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, (int)timeRemaining, ScoreCalculator.Instance.GetCurrentScore(), lives);
+            int score = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
+            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, (int)timeRemaining, score, lives);
         }
     }
 
@@ -225,7 +242,7 @@ public class GameManager : MonoBehaviour
     {
         if (goal == null) return 0;
         if (goal.type == LevelGoal.GoalType.Score)
-            return ScoreCalculator.Instance.GetCurrentScore();
+            return ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
         if (goalProgress != null && goalProgress.ContainsKey(goal))
             return goalProgress[goal];
         return 0;
@@ -344,7 +361,8 @@ public class GameManager : MonoBehaviour
                 UpdateHUD();
                 
                 // Проверяем, не проиграли ли
-                if (movesRemaining <= 0 && ScoreCalculator.Instance.GetCurrentScore() < currentLevel.scoreGoal)
+                int currentScore = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
+                if (movesRemaining <= 0 && currentScore < currentLevel.scoreGoal)
                 {
                     levelInProgress = false;
                     // Завершение будет после каскадов
@@ -590,12 +608,14 @@ public class GameManager : MonoBehaviour
         }
 
         // --- CALCULATE SCORE ---
-        ScoreCalculator.Instance.CalculateScore(toDestroy.Count, false);
+        if (ScoreCalculator.Instance != null)
+            ScoreCalculator.Instance.CalculateScore(toDestroy.Count, false);
         AudioManager.Instance?.PlayMatch();
         UpdateHUD();
         
         // Проверяем, не выиграли ли уровень
-        if (ScoreCalculator.Instance.GetCurrentScore() >= currentLevel.scoreGoal && !levelWon)
+        int score = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
+        if (score >= currentLevel.scoreGoal && !levelWon)
         {
             levelWon = true;
             levelInProgress = false;
@@ -640,16 +660,21 @@ public class GameManager : MonoBehaviour
         // каскады
         if (levelInProgress)
         {
-            ScoreCalculator.Instance.ResetCascadeMultiplier();
+            if (ScoreCalculator.Instance != null)
+                ScoreCalculator.Instance.ResetCascadeMultiplier();
             List<Cell> newMatches = FindMatches();
             if (newMatches.Count > 0)
             {
                 yield return new WaitForSeconds(0.08f);
                 yield return StartCoroutine(DestroyMatches(newMatches));
             }
-            else if (!levelWon && movesRemaining <= 0 && ScoreCalculator.Instance.GetCurrentScore() < currentLevel.scoreGoal)
+            else if (!levelWon && movesRemaining <= 0)
             {
-                LevelFailed("Ходы закончились!");
+                int currentScore = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
+                if (currentScore < currentLevel.scoreGoal)
+                {
+                    LevelFailed("Ходы закончились!");
+                }
             }
         }
         
@@ -667,23 +692,25 @@ public class GameManager : MonoBehaviour
         if (hud != null)
         {
             int lives = PlayerProgress.Instance != null ? PlayerProgress.Instance.GetLives() : 0;
+            int score = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
             hud.UpdateHUD(
                 movesRemaining,
                 (int)timeRemaining,
-                ScoreCalculator.Instance.GetCurrentScore(),
+                score,
                 lives,
                 GetGoalProgressText(currentLevel.GetPrimaryGoal())
             );
         }
     }
-    
     private void LevelWon()
     {
         levelInProgress = false;
-        int finalScore = ScoreCalculator.Instance.GetCurrentScore();
-        int stars = currentLevel.GetStarCount(finalScore);
+        int finalScore = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
+        int stars = currentLevel != null ? currentLevel.GetStarCount(finalScore) : 0;
         
-        PlayerProgress.Instance.CompleteLevelWithScore(currentLevel.levelId, finalScore);
+        if (PlayerProgress.Instance != null && currentLevel != null)
+            PlayerProgress.Instance.CompleteLevelWithScore(currentLevel.levelId, finalScore);
+        
         AudioManager.Instance?.PlayWin();
         
         Debug.Log($"LEVEL WON! Score: {finalScore}, Stars: {stars}");
@@ -696,7 +723,7 @@ public class GameManager : MonoBehaviour
     private void LevelFailed(string reason)
     {
         levelInProgress = false;
-        int currentScore = ScoreCalculator.Instance.GetCurrentScore();
+        int currentScore = ScoreCalculator.Instance != null ? ScoreCalculator.Instance.GetCurrentScore() : 0;
         
         Debug.Log($"LEVEL FAILED: {reason}");
         
@@ -709,7 +736,7 @@ public class GameManager : MonoBehaviour
         UpdateHUD();
         
         LevelCompleteUI ui = FindObjectOfType<LevelCompleteUI>();
-        if (ui != null)
+        if (ui != null && currentLevel != null)
             ui.ShowLose(currentScore, currentLevel.scoreGoal);
     }
 
