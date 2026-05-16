@@ -114,7 +114,7 @@ public class GameManager : MonoBehaviour
         if (FindObjectOfType<GameHUD>() != null)
         {
             int lives = PlayerProgress.Instance != null ? PlayerProgress.Instance.GetLives() : 0;
-            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, timeRemaining, ScoreCalculator.Instance.GetCurrentScore(), lives);
+            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, (int)timeRemaining, ScoreCalculator.Instance.GetCurrentScore(), lives);
         }
     }
 
