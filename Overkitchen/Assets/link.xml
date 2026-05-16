@@ -1,0 +1,26 @@
+<linker>
+    <!-- Keep all scripts in Assembly-CSharp when instantiated -->
+    <assembly fullname="Assembly-CSharp" preserve="partial">
+        <type fullname="*" preserve="all" when="instantiated"/>
+    </assembly>
+
+    <!-- Keep TextMesh Pro for UI -->
+    <assembly fullname="TextMeshPro" preserve="partial">
+        <namespace fullname="TMPro" preserve="all"/>
+    </assembly>
+
+    <!-- Keep specific managers (critical for gameplay) -->
+    <assembly fullname="Assembly-CSharp">
+        <type fullname="LevelManager" preserve="all"/>
+        <type fullname="PlayerProgress" preserve="all"/>
+        <type fullname="ScoreCalculator" preserve="all"/>
+        <type fullname="GameManager" preserve="all"/>
+        <type fullname="AudioManager" preserve="all"/>
+    </assembly>
+
+    <!-- Keep Serialized fields -->
+    <assembly fullname="UnityEngine.CoreModule">
+        <type fullname="UnityEngine.MonoBehaviour" preserve="all"/>
+        <type fullname="UnityEngine.ScriptableObject" preserve="all"/>
+    </assembly>
+</linker>
