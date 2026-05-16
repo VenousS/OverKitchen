@@ -15,6 +15,13 @@ public class GameManager : MonoBehaviour
     private Obstacle[,] obstacles;
 
     private bool isSwapping = false;
+    
+    // ===== LEVEL & PROGRESSION =====
+    private LevelData currentLevel;
+    private int movesRemaining;
+    private int timeRemaining = -1; // -1 = без лимита
+    private bool levelInProgress = true;
+    private bool levelWon = false;
 
     [SerializeField] private float swapDuration = 0.18f;
     [SerializeField] private float pieceFallDuration = 0.18f;
@@ -42,12 +49,41 @@ public class GameManager : MonoBehaviour
     {
         StartCoroutine(StartGame());
     }
+    
+    private void Update()
+    {
+        if (timeRemaining > 0)
+        {
+            timeRemaining -= Time.deltaTime;
+            if (timeRemaining <= 0)
+            {
+                timeRemaining = 0;
+                LevelFailed("Время истекло!");
+            }
+        }
+    }
 
     private IEnumerator StartGame()
     {
+        // Загружаем данные уровня
+        currentLevel = LevelManager.Instance.GetCurrentLevel();
+        gridSize = currentLevel.gridSize;
+        movesRemaining = currentLevel.moveLimit;
+        timeRemaining = currentLevel.timeLimit;
+        
+        // Инициализируем скоринг
+        ScoreCalculator.Instance.ResetScore();
+        
         CenterCamera();
         InitializeGrids();
         GenerateInitialBoard();
+        
+        // Спавним препятствия
+        foreach (var pos in currentLevel.obstaclePositions)
+        {
+            // TODO: Добавить prefab для препятствий в GameManager
+            // CreateObstacle(pos.x, pos.y, obstaclePrefab);
+        }
 
         // Ждём, пока все фишки упадут
         yield return new WaitForSeconds(0.25f);
@@ -61,6 +97,10 @@ public class GameManager : MonoBehaviour
             yield return StartCoroutine(DestroyMatches(matches));
             yield return new WaitForSeconds(0.1f);
         }
+        
+        // Сообщаем UI, что игра началась
+        if (FindObjectOfType<GameHUD>() != null)
+            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, timeRemaining, ScoreCalculator.Instance.GetCurrentScore());
     }
 
     // ================== GRID SETUP ==================
@@ -152,6 +192,14 @@ public class GameManager : MonoBehaviour
     {
         if (isSwapping) return;
         if (swipeDistance < 0.18f) return;
+        if (!levelInProgress || levelWon) return;
+        
+        // Проверяем лимит ходов
+        if (movesRemaining <= 0)
+        {
+            LevelFailed("Ходы закончились!");
+            return;
+        }
 
         int x = piece.x;
         int y = piece.y;
@@ -216,6 +264,20 @@ public class GameManager : MonoBehaviour
 
         if (matches.Count > 0)
         {
+            // Уменьшаем ходы только если был успешный матч
+            if (!revert)
+            {
+                movesRemaining--;
+                UpdateHUD();
+                
+                // Проверяем, не проиграли ли
+                if (movesRemaining <= 0 && ScoreCalculator.Instance.GetCurrentScore() < currentLevel.scoreGoal)
+                {
+                    levelInProgress = false;
+                    // Завершение будет после каскадов
+                }
+            }
+            
             // создаём бонусы, если нужно
             CreateBonusesAfterSwap(x1, y1, x2, y2, matches);
 
@@ -422,6 +484,17 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // --- CALCULATE SCORE ---
+        ScoreCalculator.Instance.CalculateScore(toDestroy.Count, false);
+        UpdateHUD();
+        
+        // Проверяем, не выиграли ли уровень
+        if (ScoreCalculator.Instance.GetCurrentScore() >= currentLevel.scoreGoal && !levelWon)
+        {
+            levelWon = true;
+            levelInProgress = false;
+        }
+
         // --- DAMAGE OBSTACLES NEAR MATCHES ---
         foreach (var c in toDestroy)
         {
@@ -459,12 +532,61 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(ShiftPiecesDown());
 
         // каскады
-        List<Cell> newMatches = FindMatches();
-        if (newMatches.Count > 0)
+        if (levelInProgress)
         {
-            yield return new WaitForSeconds(0.08f);
-            yield return StartCoroutine(DestroyMatches(newMatches));
+            ScoreCalculator.Instance.ResetCascadeMultiplier();
+            List<Cell> newMatches = FindMatches();
+            if (newMatches.Count > 0)
+            {
+                yield return new WaitForSeconds(0.08f);
+                yield return StartCoroutine(DestroyMatches(newMatches));
+            }
+            else if (!levelWon && movesRemaining <= 0 && ScoreCalculator.Instance.GetCurrentScore() < currentLevel.scoreGoal)
+            {
+                LevelFailed("Ходы закончились!");
+            }
         }
+        
+        // Если уровень завершён
+        if (!levelInProgress && levelWon)
+        {
+            yield return new WaitForSeconds(0.5f);
+            LevelWon();
+        }
+    }
+    
+    private void UpdateHUD()
+    {
+        GameHUD hud = FindObjectOfType<GameHUD>();
+        if (hud != null)
+            hud.UpdateHUD(movesRemaining, (int)timeRemaining, ScoreCalculator.Instance.GetCurrentScore());
+    }
+    
+    private void LevelWon()
+    {
+        levelInProgress = false;
+        int finalScore = ScoreCalculator.Instance.GetCurrentScore();
+        int stars = currentLevel.GetStarCount(finalScore);
+        
+        PlayerProgress.Instance.CompleteLevelWithScore(currentLevel.levelId, finalScore);
+        
+        Debug.Log($"LEVEL WON! Score: {finalScore}, Stars: {stars}");
+        
+        LevelCompleteUI ui = FindObjectOfType<LevelCompleteUI>();
+        if (ui != null)
+            ui.ShowWin(finalScore, stars);
+    }
+    
+    private void LevelFailed(string reason)
+    {
+        levelInProgress = false;
+        int currentScore = ScoreCalculator.Instance.GetCurrentScore();
+        
+        Debug.Log($"LEVEL FAILED: {reason}");
+        
+        LevelCompleteUI ui = FindObjectOfType<LevelCompleteUI>();
+        if (ui != null)
+            ui.ShowLose(currentScore, currentLevel.scoreGoal);
     }
 
     // ================== OBSTACLE INTERACTION ==================
