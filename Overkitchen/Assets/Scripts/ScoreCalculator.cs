@@ -15,7 +15,7 @@ public class ScoreCalculator : MonoBehaviour
     [SerializeField] private float bombColorMultiplier = 3f;
     
     private int currentScore = 0;
-    private int cascadeMultiplier = 1; // Каскадные матчи дают больше очков
+    private float cascadeMultiplier = 1f; // Каскадные матчи дают больше очков
     
     private void Awake()
     {
@@ -72,6 +72,6 @@ public class ScoreCalculator : MonoBehaviour
     
     public void ResetCascadeMultiplier()
     {
-        cascadeMultiplier = 1;
+        cascadeMultiplier = 1f;
     }
 }

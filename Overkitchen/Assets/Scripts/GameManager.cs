@@ -20,7 +20,7 @@ public class GameManager : MonoBehaviour
     // ===== LEVEL & PROGRESSION =====
     private LevelData currentLevel;
     private int movesRemaining;
-    private int timeRemaining = -1; // -1 = без лимита
+    private float timeRemaining = -1f; // -1 = без лимита
     private bool levelInProgress = true;
     private bool levelWon = false;
     private System.Collections.Generic.Dictionary<LevelGoal, int> goalProgress;

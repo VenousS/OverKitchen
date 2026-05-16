@@ -21,7 +21,7 @@ public class PieceSystem : MonoBehaviour
     public ParticleSystem bombColumnFX;
     public ParticleSystem bombColorFX;
 
-    private bool isAnimating = false;
+    
 
     // ---------------------------------------------------------
     // INIT
