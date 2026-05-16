@@ -7,6 +7,7 @@ public class GameHUD : MonoBehaviour
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI movesText;
     [SerializeField] private TextMeshProUGUI timerText;
+    [SerializeField] private TextMeshProUGUI livesText;
     [SerializeField] private TextMeshProUGUI goalText;
     [SerializeField] private Image progressBar; // Визуальный прогресс к цели
     
@@ -19,18 +20,21 @@ public class GameHUD : MonoBehaviour
     {
         currentLevel = LevelManager.Instance.GetCurrentLevel();
         
-        if (goalText != null)
-            goalText.text = $"Цель: {currentLevel.scoreGoal} очков";
+        if (currentLevel != null && goalText != null)
+            goalText.text = currentLevel.GetPrimaryGoal()?.description ?? "Цель: ---";
     }
     
-    public void UpdateHUD(int moves, int timeLeft, int score)
+    public void UpdateHUD(int moves, int timeLeft, int score, int lives, string goalProgressText = null)
     {
+        if (currentLevel == null)
+            currentLevel = LevelManager.Instance.GetCurrentLevel();
+
         if (scoreText != null)
         {
             scoreText.text = $"Очки: {score}";
             
             // Меняем цвет, если достигли цели
-            if (score >= currentLevel.scoreGoal)
+            if (currentLevel != null && score >= currentLevel.scoreGoal)
                 scoreText.color = goalReachedColor;
             else
                 scoreText.color = normalColor;
@@ -50,11 +54,21 @@ public class GameHUD : MonoBehaviour
             else
                 timerText.text = "Время: ∞";
         }
+
+        if (livesText != null)
+        {
+            livesText.text = $"Жизни: {lives}";
+        }
+
+        if (goalText != null)
+        {
+            goalText.text = !string.IsNullOrEmpty(goalProgressText) ? goalProgressText : currentLevel?.GetPrimaryGoal()?.description ?? "Цель: ---";
+        }
         
         // Обновляем прогресс-бар
-        if (progressBar != null)
+        if (progressBar != null && currentLevel != null)
         {
-            float progress = Mathf.Clamp01((float)score / currentLevel.scoreGoal);
+            float progress = currentLevel.scoreGoal > 0 ? Mathf.Clamp01((float)score / currentLevel.scoreGoal) : 0f;
             progressBar.fillAmount = progress;
         }
     }

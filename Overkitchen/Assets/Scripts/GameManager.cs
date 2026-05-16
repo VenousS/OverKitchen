@@ -10,6 +10,7 @@ public class GameManager : MonoBehaviour
     [Header("Grid")]
     [SerializeField] private int gridSize = 8;
     [SerializeField] private GameObject[] piecePrefabs;
+    [SerializeField] private GameObject obstaclePrefab;
 
     private Cell[,] grid;
     private Obstacle[,] obstacles;
@@ -22,6 +23,7 @@ public class GameManager : MonoBehaviour
     private int timeRemaining = -1; // -1 = без лимита
     private bool levelInProgress = true;
     private bool levelWon = false;
+    private System.Collections.Generic.Dictionary<LevelGoal, int> goalProgress;
 
     [SerializeField] private float swapDuration = 0.18f;
     [SerializeField] private float pieceFallDuration = 0.18f;
@@ -52,6 +54,8 @@ public class GameManager : MonoBehaviour
     
     private void Update()
     {
+        if (!levelInProgress) return;
+
         if (timeRemaining > 0)
         {
             timeRemaining -= Time.deltaTime;
@@ -59,6 +63,10 @@ public class GameManager : MonoBehaviour
             {
                 timeRemaining = 0;
                 LevelFailed("Время истекло!");
+            }
+            else
+            {
+                UpdateHUD();
             }
         }
     }
@@ -71,6 +79,8 @@ public class GameManager : MonoBehaviour
         movesRemaining = currentLevel.moveLimit;
         timeRemaining = currentLevel.timeLimit;
         
+        InitializeGoalProgress();
+        
         // Инициализируем скоринг
         ScoreCalculator.Instance.ResetScore();
         
@@ -81,12 +91,14 @@ public class GameManager : MonoBehaviour
         // Спавним препятствия
         foreach (var pos in currentLevel.obstaclePositions)
         {
-            // TODO: Добавить prefab для препятствий в GameManager
-            // CreateObstacle(pos.x, pos.y, obstaclePrefab);
+            if (obstaclePrefab != null)
+                CreateObstacle(pos.x, pos.y, obstaclePrefab, currentLevel.obstacleHp);
         }
 
         // Ждём, пока все фишки упадут
         yield return new WaitForSeconds(0.25f);
+
+        InitializeGoalProgress();
 
         // Удаляем стартовые матчи + каскады, пока поле не станет чистым
         while (true)
@@ -100,7 +112,10 @@ public class GameManager : MonoBehaviour
         
         // Сообщаем UI, что игра началась
         if (FindObjectOfType<GameHUD>() != null)
-            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, timeRemaining, ScoreCalculator.Instance.GetCurrentScore());
+        {
+            int lives = PlayerProgress.Instance != null ? PlayerProgress.Instance.GetLives() : 0;
+            FindObjectOfType<GameHUD>().UpdateHUD(movesRemaining, timeRemaining, ScoreCalculator.Instance.GetCurrentScore(), lives);
+        }
     }
 
     // ================== GRID SETUP ==================
@@ -187,6 +202,63 @@ public class GameManager : MonoBehaviour
         cam.orthographicSize = Mathf.Max(v, h);
     }
 
+    private void InitializeGoalProgress()
+    {
+        goalProgress = new System.Collections.Generic.Dictionary<LevelGoal, int>();
+
+        if (currentLevel == null) return;
+
+        foreach (var goal in currentLevel.goals)
+        {
+            if (goal != null)
+                goalProgress[goal] = 0;
+        }
+    }
+
+    private void RegisterGoalProgress(LevelGoal goal, int value)
+    {
+        if (goal == null || !goalProgress.ContainsKey(goal)) return;
+        goalProgress[goal] = Mathf.Clamp(goalProgress[goal] + value, 0, goal.target);
+    }
+
+    private int GetGoalProgress(LevelGoal goal)
+    {
+        if (goal == null) return 0;
+        if (goal.type == LevelGoal.GoalType.Score)
+            return ScoreCalculator.Instance.GetCurrentScore();
+        if (goalProgress != null && goalProgress.ContainsKey(goal))
+            return goalProgress[goal];
+        return 0;
+    }
+
+    private bool IsGoalComplete(LevelGoal goal)
+    {
+        if (goal == null) return false;
+        return GetGoalProgress(goal) >= goal.target;
+    }
+
+    private bool IsAllGoalsComplete()
+    {
+        if (currentLevel == null || currentLevel.goals == null || currentLevel.goals.Count == 0)
+            return false;
+
+        foreach (var goal in currentLevel.goals)
+        {
+            if (!IsGoalComplete(goal))
+                return false;
+        }
+
+        return true;
+    }
+
+    private string GetGoalProgressText(LevelGoal goal)
+    {
+        if (goal == null) return "";
+
+        int progress = GetGoalProgress(goal);
+        return $"{goal.description} ({progress}/{goal.target})";
+    }
+
     // ================== SWAP REQUEST FROM PieceSystem ==================
     public void MovePiece(PieceSystem piece, float swipeAngle, float swipeDistance)
     {
@@ -216,6 +288,7 @@ public class GameManager : MonoBehaviour
         // нельзя двигаться через препятствия
         if (obstacles[tx, ty] != null) return;
 
+        AudioManager.Instance?.PlaySwap();
         StartCoroutine(SwapPieces(x, y, tx, ty));
     }
     // ================== SWAP COROUTINE ==================
@@ -302,6 +375,15 @@ public class GameManager : MonoBehaviour
         TryCreateBonusOnCell(x2, y2, matches);
     }
 
+    private void OnBonusCreated(Cell cell)
+    {
+        if (cell == null || cell.ps == null) return;
+        if (cell.ps.HasBonus())
+        {
+            AudioManager.Instance?.PlayBonus();
+        }
+    }
+
     private void TryCreateBonusOnCell(int x, int y, List<Cell> matches)
     {
         if (grid[x, y] == null) return;
@@ -341,6 +423,7 @@ public class GameManager : MonoBehaviour
         if (horizCount >= 5 || vertCount >= 5)
         {
             grid[x, y].ps.SetBonus(BonusType.BombColor);
+            OnBonusCreated(grid[x, y]);
             return;
         }
 
@@ -348,6 +431,7 @@ public class GameManager : MonoBehaviour
         if (horizCount == 4)
         {
             grid[x, y].ps.SetBonus(BonusType.BombRow);
+            OnBonusCreated(grid[x, y]);
             return;
         }
 
@@ -355,6 +439,7 @@ public class GameManager : MonoBehaviour
         if (vertCount == 4)
         {
             grid[x, y].ps.SetBonus(BonusType.BombColumn);
+            OnBonusCreated(grid[x, y]);
             return;
         }
     }
@@ -484,8 +569,29 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // --- TRACK GOAL PROGRESS ---
+        foreach (var c in toDestroy)
+        {
+            if (c == null || c.ps == null) continue;
+            foreach (var goal in currentLevel.goals)
+            {
+                if (goal == null) continue;
+                if (goal.type == LevelGoal.GoalType.CollectPieceType && c.ps.GetPieceType() == goal.targetPieceType)
+                {
+                    RegisterGoalProgress(goal, 1);
+                }
+            }
+        }
+
+        if (IsAllGoalsComplete() && !levelWon)
+        {
+            levelWon = true;
+            levelInProgress = false;
+        }
+
         // --- CALCULATE SCORE ---
         ScoreCalculator.Instance.CalculateScore(toDestroy.Count, false);
+        AudioManager.Instance?.PlayMatch();
         UpdateHUD();
         
         // Проверяем, не выиграли ли уровень
@@ -559,7 +665,16 @@ public class GameManager : MonoBehaviour
     {
         GameHUD hud = FindObjectOfType<GameHUD>();
         if (hud != null)
-            hud.UpdateHUD(movesRemaining, (int)timeRemaining, ScoreCalculator.Instance.GetCurrentScore());
+        {
+            int lives = PlayerProgress.Instance != null ? PlayerProgress.Instance.GetLives() : 0;
+            hud.UpdateHUD(
+                movesRemaining,
+                (int)timeRemaining,
+                ScoreCalculator.Instance.GetCurrentScore(),
+                lives,
+                GetGoalProgressText(currentLevel.GetPrimaryGoal())
+            );
+        }
     }
     
     private void LevelWon()
@@ -569,6 +684,7 @@ public class GameManager : MonoBehaviour
         int stars = currentLevel.GetStarCount(finalScore);
         
         PlayerProgress.Instance.CompleteLevelWithScore(currentLevel.levelId, finalScore);
+        AudioManager.Instance?.PlayWin();
         
         Debug.Log($"LEVEL WON! Score: {finalScore}, Stars: {stars}");
         
@@ -583,6 +699,14 @@ public class GameManager : MonoBehaviour
         int currentScore = ScoreCalculator.Instance.GetCurrentScore();
         
         Debug.Log($"LEVEL FAILED: {reason}");
+        
+        if (PlayerProgress.Instance != null && PlayerProgress.Instance.GetLives() > 0)
+        {
+            PlayerProgress.Instance.SpendLife();
+        }
+        
+        AudioManager.Instance?.PlayLose();
+        UpdateHUD();
         
         LevelCompleteUI ui = FindObjectOfType<LevelCompleteUI>();
         if (ui != null)
@@ -603,6 +727,19 @@ public class GameManager : MonoBehaviour
         if (!ob.IsAlive())
         {
             obstacles[x, y] = null;
+
+            foreach (var goal in currentLevel.goals)
+            {
+                if (goal != null && goal.type == LevelGoal.GoalType.DestroyObstacles)
+                {
+                    RegisterGoalProgress(goal, 1);
+                    if (IsAllGoalsComplete() && !levelWon)
+                    {
+                        levelWon = true;
+                        levelInProgress = false;
+                    }
+                }
+            }
         }
     }
 

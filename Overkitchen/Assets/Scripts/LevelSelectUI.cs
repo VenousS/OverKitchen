@@ -29,7 +29,7 @@ public class LevelSelectUI : MonoBehaviour
             GameObject btn = Instantiate(levelButtonPrefab, levelButtonContainer);
             Button button = btn.GetComponent<Button>();
             TextMeshProUGUI buttonText = btn.GetComponentInChildren<TextMeshProUGUI>();
-            Image stars = btn.transform.Find("Stars")?.GetComponent<Image>();
+            TextMeshProUGUI starsText = btn.transform.Find("Stars")?.GetComponent<TextMeshProUGUI>();
             
             int levelId = i;
             LevelData levelData = LevelManager.Instance.GetLevel(levelId);
@@ -42,11 +42,11 @@ public class LevelSelectUI : MonoBehaviour
                 button.interactable = true;
                 button.onClick.AddListener(() => SelectLevel(levelId));
                 
-                if (progress.completed && stars != null)
+                if (progress.completed && starsText != null)
                 {
                     // Показываем звёзды
                     string starsStr = new string('⭐', progress.starsEarned);
-                    stars.GetComponent<TextMeshProUGUI>().text = starsStr;
+                    starsText.text = starsStr;
                 }
             }
             else

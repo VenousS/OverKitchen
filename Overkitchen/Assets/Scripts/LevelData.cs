@@ -4,9 +4,10 @@ using UnityEngine;
 [System.Serializable]
 public class LevelGoal
 {
-    public enum GoalType { Score, Elements, Time }
+    public enum GoalType { Score, CollectPieceType, DestroyObstacles, Time }
     public GoalType type;
     public int target; // целевое значение
+    public int targetPieceType; // используется для целей сбора определённого типа фишки
     public string description; // "Собрать 50 помидоров"
 }
 
@@ -20,6 +21,7 @@ public class LevelData
     public int timeLimit = -1; // -1 = без лимита времени
     public int scoreGoal = 25000;
     public int difficulty = 1; // 1-5
+    public int obstacleHp = 2;
     
     public List<LevelGoal> goals = new List<LevelGoal>();
     public List<Vector2Int> obstaclePositions = new List<Vector2Int>();
@@ -34,12 +36,36 @@ public class LevelData
         levelId = id;
         levelName = name;
         
-        // Задаём goal по умолчанию
-        LevelGoal scoreGoal = new LevelGoal();
-        scoreGoal.type = LevelGoal.GoalType.Score;
-        scoreGoal.target = this.scoreGoal;
-        scoreGoal.description = $"Набери {this.scoreGoal} очков";
-        goals.Add(scoreGoal);
+        RefreshGoals();
+    }
+
+    public void RefreshGoals()
+    {
+        goals.Clear();
+        LevelGoal scoreGoalEntry = new LevelGoal();
+        scoreGoalEntry.type = LevelGoal.GoalType.Score;
+        scoreGoalEntry.target = this.scoreGoal;
+        scoreGoalEntry.description = $"Набери {this.scoreGoal} очков";
+        goals.Add(scoreGoalEntry);
+    }
+
+    public void AddGoal(LevelGoal goal)
+    {
+        if (goal == null) return;
+        goals.Add(goal);
+    }
+
+    public LevelGoal GetPrimaryGoal()
+    {
+        return goals.Count > 0 ? goals[0] : null;
+    }
+
+    public int GetStarCount(int finalScore)
+    {
+        if (finalScore >= starThreshold3) return 3;
+        if (finalScore >= starThreshold2) return 2;
+        if (finalScore >= starThreshold1) return 1;
+        return 0;
     }
     
     public int GetStarCount(int finalScore)
