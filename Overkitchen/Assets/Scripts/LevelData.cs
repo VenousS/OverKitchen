@@ -67,12 +67,4 @@ public class LevelData
         if (finalScore >= starThreshold1) return 1;
         return 0;
     }
-    
-    public int GetStarCount(int finalScore)
-    {
-        if (finalScore >= starThreshold3) return 3;
-        if (finalScore >= starThreshold2) return 2;
-        if (finalScore >= starThreshold1) return 1;
-        return 0;
-    }
 }
